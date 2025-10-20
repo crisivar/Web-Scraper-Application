@@ -1,0 +1,223 @@
+{% extends 'scraper/base.html' %}
+
+{% block title %}{{ page.title|default:page.url }} - Web Scraper{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'scraper:page_list' %}">My Pages</a></li>
+        <li class="breadcrumb-item active">{{ page.title|default:"Page Details"|truncatechars:30 }}</li>
+      </ol>
+    </nav>
+  </div>
+</div>
+
+<!-- Page info -->
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Page Information</h5>
+        <div class="d-flex gap-2">
+          {% if page.status != 'processing' %}
+          <form method="post" action="{% url 'scraper:rescrape_page' page.pk %}" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-success btn-sm">
+              Re-scrape
+            </button>
+          </form>
+          {% endif %}
+          <a href="{% url 'scraper:delete_page' page.pk %}" class="btn btn-danger btn-sm">
+            Delete
+          </a>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-8">
+            <h4>{{ page.title|default:"No Title" }}</h4>
+            <p class="text-muted mb-2">
+              <a href="{{ page.url }}" target="_blank" class="text-decoration-none">
+                {{ page.url }}
+              </a>
+            </p>
+            <p class="mb-1">
+              <strong>Status:</strong>
+              <span
+                class="badge text-{% if page.status == 'completed' %}success{% elif page.status == 'processing' %}warning{% elif page.status == 'failed' %}danger{% else %}secondary{% endif %}">
+                {% if page.status == 'processing' %}
+                Processing...
+                {% endif %}
+                {{ page.get_status_display }}
+              </span>
+            </p>
+            {% if page.error_message %}
+            <div class="alert alert-danger mt-2">
+              <strong>Error:</strong> {{ page.error_message }}
+            </div>
+            {% endif %}
+          </div>
+          <div class="col-md-4 text-md-end">
+            <div class="mb-2">
+              <strong>Total links:</strong>
+              <span class="badge text-info fs-6">{{ total_links }}</span>
+            </div>
+            <div class="mb-2">
+              <strong>Created:</strong><br>
+              <small class="text-muted">{{ page.created_at|date:"M d, Y H:i" }}</small>
+            </div>
+            {% if page.updated_at != page.created_at %}
+            <div>
+              <strong>Updated:</strong><br>
+              <small class="text-muted">{{ page.updated_at|date:"M d, Y H:i" }}</small>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Links section -->
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+          Found Links ({{ total_links }})
+        </h5>
+      </div>
+      <div class="card-body">
+        {% if page.status == 'processing' %}
+        <div class="text-center py-4">
+          <div class="spinner-border text-primary mb-3" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <h5>Scraping in progress...</h5>
+          <p class="text-muted">Please wait while we extract links from the page.</p>
+        </div>
+        {% elif page.status == 'failed' %}
+        <div class="text-center py-4">
+          <span class="text-danger fs-5 mb-3 d-block">Error</span>
+          <h5>Scraping failed</h5>
+          <p class="text-muted">Unable to scrape this page. Please check the URL and try again.</p>
+        </div>
+        {% elif total_links > 0 %}
+
+        <!-- Search links -->
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <form method="get" class="d-flex">
+              <input type="text" name="search" class="form-control" placeholder="Search links..."
+                value="{{ search_query }}">
+              <button type="submit" class="btn btn-primary ms-2">
+                Search
+              </button>
+              {% if search_query %}
+              <a href="{% url 'scraper:page_detail' page.pk %}" class="btn btn-secondary ms-2">
+                Clear
+              </a>
+              {% endif %}
+            </form>
+          </div>
+        </div>
+
+        <!-- Links List -->
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead class="table-light">
+              <tr>
+                <th style="width: 40%;">Link Text</th>
+                <th style="width: 50%;">URL</th>
+                <th style="width: 10%;">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for link in links_page_obj %}
+              <tr>
+                <td>
+                  <div class="text-truncate" style="max-width: 300px;" title="{{ link.name }}">
+                    {{ link.name|default:"No text" }}
+                  </div>
+                </td>
+                <td>
+                  <div class="text-truncate" style="max-width: 400px;" title="{{ link.url }}">
+                    <a href="{{ link.url }}" target="_blank" class="text-decoration-none">
+                      {{ link.url }}
+                    </a>
+                  </div>
+                </td>
+                <td>
+                  <a href="{{ link.url }}" target="_blank" class="btn btn-info btn-sm" title="Visit Link">
+                    Visit
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if links_page_obj.has_other_pages %}
+        <nav aria-label="Links pagination" class="mt-3">
+          <ul class="pagination justify-content-center">
+            <!-- Previous button -->
+            {% if links_page_obj.has_previous %}
+            <li class="page-item">
+              <a class="page-link"
+                href="?page={{ links_page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}">Previous</a>
+            </li>
+            {% endif %}
+
+            <!-- Page numbers -->
+            {% for page_num in links_page_obj.paginator.page_range %}
+            {% if page_num == links_page_obj.number %}
+            <li class="page-item active">
+              <span class="page-link">{{ page_num }}</span>
+            </li>
+            {% else %}
+            <li class="page-item">
+              <a class="page-link"
+                href="?page={{ page_num }}{% if search_query %}&search={{ search_query }}{% endif %}">{{ page_num }}</a>
+            </li>
+            {% endif %}
+            {% endfor %}
+
+            <!-- Next button -->
+            {% if links_page_obj.has_next %}
+            <li class="page-item">
+              <a class="page-link"
+                href="?page={{ links_page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}">Next</a>
+            </li>
+            {% endif %}
+          </ul>
+        </nav>
+        {% endif %}
+
+        {% else %}
+        <div class="text-center py-4">
+          <span class="text-muted fs-5 mb-3 d-block">No Links Found</span>
+          <h5>No links found</h5>
+          <p class="text-muted">This page doesn't contain any links to extract.</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Auto-refresh if page is still processing
+  {% if page.status == 'processing' %}
+  setTimeout(function () {
+    location.reload();
+  }, 5000);
+  {% endif %}
+</script>
+{% endblock %}

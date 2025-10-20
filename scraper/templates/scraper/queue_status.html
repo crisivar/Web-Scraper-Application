@@ -1,0 +1,116 @@
+{% extends 'scraper/base.html' %}
+
+{% block title %}Queue Status - Web Scraper{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h1>Background Queue Status</h1>
+      <a href="{% url 'scraper:page_list' %}" class="btn btn-primary">
+        Back to Pages
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- Celery Status -->
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h5 class="mb-0">
+          Celery Worker Status
+        </h5>
+      </div>
+      <div class="card-body">
+        {% if celery_available %}
+        <div class="alert alert-success">
+          ✓
+          <strong>Connected:</strong> Celery workers are available and processing background tasks.
+        </div>
+        {% else %}
+        <div class="alert alert-warning">
+          !
+          <strong>No Workers:</strong> No Celery workers detected. Background tasks will fall back to synchronous
+          processing.
+          {% if error %}
+          <br><small><strong>Error:</strong> {{ error }}</small>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Queue Statistics -->
+<div class="row">
+  <div class="col-md-6">
+    <div class="card text-center">
+      <div class="card-body">
+        <span class="fs-3 text-info mb-2 d-block">Active</span>
+        <h4 class="card-title">{{ queue_stats.active_tasks }}</h4>
+        <p class="card-text">Active Tasks</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div class="card text-center">
+      <div class="card-body">
+        <span class="fs-3 text-warning mb-2 d-block">Pending</span>
+        <h4 class="card-title">{{ queue_stats.scheduled_tasks }}</h4>
+        <p class="card-text">Scheduled Tasks</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Worker Statistics -->
+{% if queue_stats.worker_stats %}
+<div class="row mt-4">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h5 class="mb-0">
+          Worker Details
+        </h5>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>Worker</th>
+                <th>Active Tasks</th>
+                <th>Scheduled Tasks</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for worker, stats in queue_stats.worker_stats.items %}
+              <tr>
+                <td>{{ worker }}</td>
+                <td>{{ stats.active|default:0 }}</td>
+                <td>{{ stats.scheduled|default:0 }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  setInterval(function () {
+    location.reload();
+  }, 10000);
+</script>
+{% endblock %}
